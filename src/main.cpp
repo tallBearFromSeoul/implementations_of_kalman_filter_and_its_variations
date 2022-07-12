@@ -24,15 +24,16 @@ int main(int argc, char* argv[]) {
 		std::cout<<"multivariate Gaussian distribution sample : \n"<<res2<<"\n";
 	}
 	*/
-	float l_range = 20.f;
-	float r_range = 20.f;
-	Li_Radar *scanner = new Li_Radar(l_range);
+	float scanner_range = 20.f;
+	Li_Radar *scanner = new Li_Radar(scanner_range);
 	World *world = new World();
 	ObjetFactory *factory = new ObjetFactory();
-	float max_bounds[6] {-20.f,20.f,-20.f,20.f,-0.4f,0.4f};
+	float max_bounds[6] {-20.f,20.f,-20.f,20.f,0.2f,0.4f};
 	factory->createNObstacles(1, max_bounds, world->obstacles());
 
-	KF *kf = new KF();
+	KF *kf_jo = new KF("kalman_joseph");
+	KF *kf_kg = new KF("kalman_gain");
+	KF *kf_rc = new KF("kalman_recursive");
 
 	RowVec2f p_init {0.f,0.f};
 	std::unordered_map<int, Vec4f> *xm;
@@ -42,17 +43,13 @@ int main(int argc, char* argv[]) {
 		std::vector<ObsPtr> obstacles_in_range;
 		std::cout<<"iteration #"<<i<<"\n";
 		scanner->scan(p_init, world->obstacles(), obstacles_in_range);
-		/*
-		for (const ObsPtr &__obs : obstacles_in_range) {
-			
-			RowVec2f noise = __obs->noisy_pos()-__obs->true_pos();
-			RowVec2f noise_perc = noise.array()*100.f / __obs->true_pos().array();
-			std::cout<<"obs #"<<j++<<"  : [noise | noise percent | true_pos | noisy_pos] == ["<<noise<<" | "<<noise_perc<<" | "<<__obs->true_pos()<<" | "<<__obs->noisy_pos()<<"]\n";
-		}
-		*/
-		xm = kf->update_recursive(obstacles_in_range, scanner);
+		xm = kf_rc->update_recursive(obstacles_in_range, scanner);
+		xm = kf_kg->update_kalman_gain(obstacles_in_range, scanner, false);
+		xm = kf_jo->update_kalman_gain(obstacles_in_range, scanner, true);
 		world->update();
 	}
-	kf->kf_output.close();
+	kf_rc->kf_output.close();
+	kf_kg->kf_output.close();
+	kf_jo->kf_output.close();
 	return 0;
 }
